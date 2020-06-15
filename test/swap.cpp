@@ -1,13 +1,15 @@
- #include <emp-tool/emp-tool.h>
+#include <emp-tool/emp-tool.h>
 #include "ESwap/ESwap.h"
+#include "ESwap/json.hpp"
+using namespace nlohmann;
 using namespace emp;
 using namespace std;
 
 
 int port, party;
 NetIO * io;
-CircuitFile sha("/home/kzoacn/ESwap/files/sha-256.txt");
-CircuitFile aes("/home/kzoacn/ESwap/files/AES-non-expanded.txt");
+CircuitFile sha("./files/sha-256.txt");
+CircuitFile aes("./files/AES-non-expanded.txt");
 
 void to_bits(block *out, block in)
 {
@@ -138,19 +140,34 @@ Bit EOS(void* _ctx){
 }
 
 int main(int argc, char** argv) {
+ 	if(argc!=2){
+		fprintf(stderr,"usage: ./bin/swap <config.json>\n");
+		return 0;	
+	}
+
+	ifstream fin(argv[1]);
+	json js;
+	fin>>js;
+
+	party=js["party"];
+	port=js["port"];
+	string ip=js["ip"];
+	string input_file=js["input_file"];
+
  
-	parse_party_and_port(argv, &party, &port);
 	io = new NetIO(party==PROVER ? nullptr : "127.0.0.1", port);
     
-	setup_arithmetic_zk(io, party);
+	
 
 
 
-    if(party==ALICE){
-        msg="imAlice";
-    }else{
-        msg="I am Bob";
+    ifstream messsage_in(input_file);
+    getline(messsage_in,msg);
+    if(msg.length()*8>128){
+        error("message too long");
+        return 0;
     }
+    
  
 
     PRG prng;
@@ -182,75 +199,82 @@ int main(int argc, char** argv) {
 
 
 
-    EOS_CTX ctx; 
-    ctx.pt=pt;
-    ctx.k=k;
-    if(party==PROVER){
-        io->send_block(ci,128);
-        io->flush();
-        io->recv_block(oci,128);
-        ctx.ci=ci;
 
-        for(int i=0;i<128;i++){
-            io->send_block(com[i],256);
-            ctx.com[i]=com[i];
+    for(int p : vector<int>{0,1}){
+        int role=(party-1+p)%2+1;
+        EOS_CTX ctx; 
+        ctx.pt=pt;
+        ctx.k=k;
+        if(role==PROVER){
+            io->send_block(ci,128);
+            io->flush();
+            io->recv_block(oci,128);
+            ctx.ci=ci;
+
+            for(int i=0;i<128;i++){
+                io->send_block(com[i],256);
+                ctx.com[i]=com[i];
+            }
+            io->flush();
+        }else{
+            io->recv_block(oci,128);
+            io->send_block(ci,128);
+            io->flush();
+            ctx.ci=oci;
+        
+            for(int i=0;i<128;i++){
+                io->recv_block(ocom[i],256);
+                ctx.com[i]=ocom[i];
+            }
         }
-        io->flush();
-    }else{
-        io->recv_block(oci,128);
-        io->send_block(ci,128);
-        io->flush();
-        ctx.ci=oci;
     
-        for(int i=0;i<128;i++){
-            io->recv_block(ocom[i],256);
-            ctx.com[i]=ocom[i];
+        setup_arithmetic_zk(io, role);
+        if(!judge(io,role,&ctx,EOS)){
+            error("EOS failed");
+            return 0;
+        }else{
+            cerr<<"ZK passed"<<endl;
         }
     }
- 
-
-	if(!judge(io,party,&ctx,EOS)){
-		error("EOS failed");
-		return 0;
-	}
     
-   
-    for(int i=0;i<128;i++){
-        block rr[128],out[256];
-        if(party==PROVER){
-            io->send_block(r[i],128);
-            io->flush();
+    for(int p : vector<int>{0,1}){
+        int role=(party-1+p)%2+1;
+        for(int i=0;i<128;i++){
+            block rr[128],out[256];
+            if(role==PROVER){
+                io->send_block(r[i],128);
+                io->flush();
 
-        }else{
-            io->recv_block(rr,128);
-            sha_compute(out,rr,128);
-            ok[i]=rr[127];
-            for(int j=0;j<256;j++){
-                if(getLSB(out[j])!=getLSB(ocom[i][j])){
-                    puts("Decom failed!");
-                    return 0;
+            }else{
+                io->recv_block(rr,128);
+                sha_compute(out,rr,128);
+                ok[i]=rr[127];
+                for(int j=0;j<256;j++){
+                    if(getLSB(out[j])!=getLSB(ocom[i][j])){
+                        error("Decom failed!");
+                        return 0;
+                    }
                 }
             }
         }
     }
+        block okey,oblk;
+        from_bits(okey,ok);
+        from_bits(oblk,oci);
+
+
+        AES_set_decrypt_key(okey,&aes_key);
+        AES_ecb_decrypt_blks(&oblk,1,&aes_key);
+
+        string omsg;
+        omsg.resize(16);
+
+        for(int i=0;i<16;i++)
+            omsg[i]=((char*)&oblk)[i];
+
+
+        cout<<omsg<<endl;
     
-    block okey,oblk;
-    from_bits(okey,ok);
-    from_bits(oblk,oci);
-
-
-   AES_set_decrypt_key(okey,&aes_key);
-   AES_ecb_decrypt_blks(&oblk,1,&aes_key);
-
-    string omsg;
-    omsg.resize(16);
-
-   for(int i=0;i<16;i++)
-        omsg[i]=((char*)&oblk)[i];
-
-
-    cout<<omsg<<endl;
-
 
     puts("Yes");
 
