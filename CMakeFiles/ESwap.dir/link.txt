@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -pthread -Wall -march=native -O3 -maes -mrdseed -std=c++11 -pthread -Wall -march=native -O3 -maes -mrdseed -std=c++11  -shared -Wl,-soname,libESwap.so -o libESwap.so CMakeFiles/ESwap.dir/ESwap/ESwap.cpp.o 

@@ -1,0 +1,16 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/kzoacn/ESwap/ESwap/ESwap.cpp
+ESwap/arithmetic_execution.h
+/home/kzoacn/ESwap/ESwap/ESwap/arithmetic_execution.h
+
+ESwap/arithmetic_execution.h
+emp-tool/emp-tool.h
+ESwap/emp-tool/emp-tool.h
+
