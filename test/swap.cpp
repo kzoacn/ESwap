@@ -219,7 +219,7 @@ int main(int argc, char** argv) {
 
 
 
-
+    // p==0 ALICE=PROVER; p==1 BOB=PROVER
     for(int p : vector<int>{0,1}){
         int role=(party-1+p)%2+1;
         EOS_CTX ctx; 
