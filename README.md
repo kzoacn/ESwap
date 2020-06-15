@@ -27,6 +27,7 @@ Swap two factorizations
 
 ```
 git clone https://github.com/kzoacn/ESwap
+cd ESwap
 cmake . -DTHREADING=on
 make
 bash run
