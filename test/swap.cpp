@@ -258,9 +258,9 @@ int main(int argc, char** argv) {
         }
     }
     
-    for(int p : vector<int>{0,1}){
+    for(int i=0;i<128;i++){
+        for(int p : vector<int>{0,1}){
         int role=(party-1+p)%2+1;
-        for(int i=0;i<128;i++){
             block rr[128],out[256];
             if(role==PROVER){
                 io->send_block(r[i],128);
