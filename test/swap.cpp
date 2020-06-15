@@ -92,6 +92,7 @@ struct  EOS_CTX
 {
     block *pt,*k,*ci; 
     block *com[128];   
+    int data;
 };
 
 
@@ -108,6 +109,23 @@ Bit EOS(void* _ctx){
         keys[i]=Bit(getLSB(ctx->k[i]),PROVER); 
         cipher[i]=Bit(getLSB(ctx->ci[i]),PUBLIC); 
     }
+    Number tmpx(BITLENGTH,0,PUBLIC);
+    Number tmpy(BITLENGTH,0,PUBLIC);
+    Number zero(BITLENGTH,0,PUBLIC);
+    Number one(BITLENGTH,1,PUBLIC);
+    Number t;
+
+    for(int j=3;j>=0;j--)
+    for(int i=0;i<8;i++){
+        t=zero.select(plain[8*j+i],one);
+        tmpx=tmpx*2+t;
+        t=zero.select(plain[8*j+i+32],one);
+        tmpy=tmpy*2+t;
+    }
+
+    Number prod(BITLENGTH, ctx->data ,PUBLIC);
+    
+    ans=ans&(prod==tmpx*tmpy);
 
     aes128.compute((block*)out,(block*)plain,(block*)keys);
  
@@ -161,12 +179,6 @@ int main(int argc, char** argv) {
 
 
 
-    ifstream messsage_in(input_file);
-    getline(messsage_in,msg);
-    if(msg.length()*8>128){
-        error("message too long");
-        return 0;
-    }
     
  
 
@@ -178,11 +190,20 @@ int main(int argc, char** argv) {
    AES_KEY aes_key;
    AES_set_encrypt_key(key,&aes_key);
    blk=zero_block();
-   for(int i=0;i<(int)msg.length();i++)
-        ((unsigned char*)&blk)[i]=msg[i];
+
+   //read witness
+
+    ifstream messsage_in(input_file);
+    //getline(messsage_in,msg); 
+    unsigned int tmpx,tmpy;
+    messsage_in>>tmpx>>tmpy;
+    ((unsigned int*)&blk)[0]=tmpx;
+    ((unsigned int*)&blk)[1]=tmpy;
+    //for(int i=0;i<(int)msg.length();i++)
+    //    ((unsigned char*)&blk)[i]=msg[i]; 
 
     plain_text=blk;
-   AES_ecb_encrypt_blks(&blk,1,&aes_key);
+    AES_ecb_encrypt_blks(&blk,1,&aes_key);
     
     to_bits(ci,blk);
     to_bits(pt,plain_text);
@@ -199,12 +220,12 @@ int main(int argc, char** argv) {
 
 
 
-
     for(int p : vector<int>{0,1}){
         int role=(party-1+p)%2+1;
         EOS_CTX ctx; 
         ctx.pt=pt;
         ctx.k=k;
+        ctx.data=  p==0 ? 211*431 : 233*229;
         if(role==PROVER){
             io->send_block(ci,128);
             io->flush();
@@ -266,15 +287,19 @@ int main(int argc, char** argv) {
         AES_set_decrypt_key(okey,&aes_key);
         AES_ecb_decrypt_blks(&oblk,1,&aes_key);
 
-        string omsg;
+
+        tmpx=((unsigned int*)&oblk)[0];
+        tmpy=((unsigned int*)&oblk)[1];
+
+       /* string omsg;
         omsg.resize(16);
 
         for(int i=0;i<16;i++)
             omsg[i]=((char*)&oblk)[i];
 
 
-        cout<<omsg<<endl;
-    
+    */
+        cerr<<tmpx<<" "<<tmpy<<endl;
 
     puts("Yes");
 
